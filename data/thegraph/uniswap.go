@@ -109,10 +109,81 @@ func (u uniswap) AssetSwapVolume(id string, start int64, end int64) (float64, er
 	return total, nil
 }
 
-func (u uniswap) SwapsInBlock(id string) {
-
+type transactionQueryResponse struct {
+	Data struct {
+		Transactions []struct {
+			ID          string      `json:"id"`
+			BlockNumber string      `json:"blockNumber"`
+			Swaps       []data.Swap `json:"swaps"`
+		} `json:"transactions"`
+	} `json:"data"`
 }
 
-func (u uniswap) AssetsSwappedInBlock(id string) {
+func (u uniswap) SwapsInBlock(id string) ([]data.Swap, error) {
+	trx, err := u.queryTransactions(id)
+	if err != nil {
+		return nil, err
+	}
+	swaps := make([]data.Swap, 0)
+	for _, t := range trx.Data.Transactions {
+		swaps = append(swaps, t.Swaps...)
+	}
+	return swaps, nil
+}
 
+func (u uniswap) AssetsSwappedInBlock(id string) ([]data.Token, error) {
+	trx, err := u.queryTransactions(id)
+	if err != nil {
+		return nil, err
+	}
+	tokenSet := map[string]data.Token{}
+	for _, t := range trx.Data.Transactions {
+		for _, s := range t.Swaps {
+			tokenSet[s.FirstToken.ID] = s.FirstToken
+			tokenSet[s.SecondToken.ID] = s.SecondToken
+		}
+	}
+	tokens := make([]data.Token, len(tokenSet))
+	i := 0
+	for _, token := range tokenSet {
+		tokens[i] = token
+		i++
+	}
+	return tokens, nil
+}
+
+func (u uniswap) queryTransactions(id string) (transactionQueryResponse, error) {
+	var trx transactionQueryResponse
+	res, err := u.client.Post(u.url, "application/json", m{
+		"query": fmt.Sprintf(`query {
+			transactions(where: { blockNumber: "%v"}) {
+				id,
+				blockNumber,
+				swaps {
+				  id,
+				  token0 {
+					id,
+					name  
+				  },
+				  token1 {
+					id,
+					name
+				  },
+				  amountUSD
+				}
+			  }
+		}`, id),
+	}.json())
+	if err != nil {
+		return trx, fmt.Errorf("error sending request: %w", err)
+	}
+	rawBody, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return trx, fmt.Errorf("error reading response: %w", err)
+	}
+	err = json.Unmarshal(rawBody, &trx)
+	if err != nil {
+		return trx, fmt.Errorf("error unmarshaling json response: %w", err)
+	}
+	return trx, nil
 }
