@@ -15,6 +15,7 @@ type uniswap struct {
 	client http.Client
 }
 
+/*NewUniswap provides a new instance of TheGraph API implementation for the uniswap data provider interface*/
 func NewUniswap() uniswap {
 	return uniswap{
 		url:    "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3",
@@ -24,6 +25,10 @@ func NewUniswap() uniswap {
 
 var _ data.Uniswap = uniswap{}
 
+/*PoolsWithAsset fetches all the pools that contains the token id
+it makes two queries to the graph because there's no orWhere option,
+so we check the first token and second tokens for the wanted token.
+*/
 func (u uniswap) PoolsWithAsset(id string) ([]data.Pool, error) {
 	tok0, err := u.poolQuery(id, "token0")
 	if err != nil {
@@ -76,9 +81,12 @@ type tokenDayQueryResponse struct {
 	} `json:"data"`
 }
 
+/*AssetSwapVolume calculates the total volume traded within the provided date range
+it fetches token day data and calculates the sum*/
 func (u uniswap) AssetSwapVolume(id string, start int64, end int64) (float64, error) {
 	res, err := u.client.Post(u.url, "application/json", m{
-		"query": fmt.Sprintf(`query {
+		// notes: volume_gt: 0 so as to avoid loading token day data with no volume traded
+		"query": fmt.Sprintf(`query { 
 			tokenDayDatas(where: { token: "%s", volume_gt: 0, date_gte: %v, date_lte: %v}) {
 				volumeUSD
 			  }
@@ -119,6 +127,8 @@ type transactionQueryResponse struct {
 	} `json:"data"`
 }
 
+/*SwapsInBlock fetches all the swaps in the block by finding all the transactions in the block
+and concating the transaction swaps*/
 func (u uniswap) SwapsInBlock(id string) ([]data.Swap, error) {
 	trx, err := u.queryTransactions(id)
 	if err != nil {
@@ -131,11 +141,14 @@ func (u uniswap) SwapsInBlock(id string) ([]data.Swap, error) {
 	return swaps, nil
 }
 
+/*AssetsSwappedInBlock fetches the assets that were traded in the provided block number
+the returned slice is a valid set without any repeated values*/
 func (u uniswap) AssetsSwappedInBlock(id string) ([]data.Token, error) {
 	trx, err := u.queryTransactions(id)
 	if err != nil {
 		return nil, err
 	}
+	// note: using a map as a set to get rid of repeated token entries
 	tokenSet := map[string]data.Token{}
 	for _, t := range trx.Data.Transactions {
 		for _, s := range t.Swaps {

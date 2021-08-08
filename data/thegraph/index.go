@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 )
 
+/*convencience methods to create gql queries and convert them to io.Reader for use with http.Post*/
 type m map[string]interface{}
 
 func (q m) json() *bytes.Buffer {
