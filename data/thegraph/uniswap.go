@@ -1,9 +1,7 @@
 package thegraph
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 
@@ -11,15 +9,16 @@ import (
 )
 
 type uniswap struct {
-	url    string
-	client http.Client
+	gql GQLClient
 }
 
 /*NewUniswap provides a new instance of TheGraph API implementation for the uniswap data provider interface*/
 func NewUniswap() uniswap {
 	return uniswap{
-		url:    "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3",
-		client: http.Client{},
+		gql: httpPostGQL{
+			url: "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3",
+			c:   http.Client{},
+		},
 	}
 }
 
@@ -48,7 +47,8 @@ type poolQueryResponse struct {
 }
 
 func (u uniswap) poolQuery(id, key string) ([]data.Pool, error) {
-	res, err := u.client.Post(u.url, "application/json", m{
+	var result poolQueryResponse
+	err := u.gql.Send(m{
 		"query": fmt.Sprintf(`query {
 			pools(where: { %s: "%s"}) {
 				id,
@@ -57,16 +57,7 @@ func (u uniswap) poolQuery(id, key string) ([]data.Pool, error) {
 			}
 		}
 		`, key, id),
-	}.json())
-	if err != nil {
-		return nil, fmt.Errorf("error sending request: %w", err)
-	}
-	rawBody, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading response: %w", err)
-	}
-	var result poolQueryResponse
-	err = json.Unmarshal(rawBody, &result)
+	}.json(), &result)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling json response: %w", err)
 	}
@@ -84,7 +75,8 @@ type tokenDayQueryResponse struct {
 /*AssetSwapVolume calculates the total volume traded within the provided date range
 it fetches token day data and calculates the sum*/
 func (u uniswap) AssetSwapVolume(id string, start int64, end int64) (float64, error) {
-	res, err := u.client.Post(u.url, "application/json", m{
+	var result tokenDayQueryResponse
+	err := u.gql.Send(m{
 		// notes: volume_gt: 0 so as to avoid loading token day data with no volume traded
 		"query": fmt.Sprintf(`query { 
 			tokenDayDatas(where: { token: "%s", volume_gt: 0, date_gte: %v, date_lte: %v}) {
@@ -92,20 +84,10 @@ func (u uniswap) AssetSwapVolume(id string, start int64, end int64) (float64, er
 			  }
 		}
 		`, id, start, end),
-	}.json())
-	if err != nil {
-		return 0, fmt.Errorf("error sending request: %w", err)
-	}
-	rawBody, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return 0, fmt.Errorf("error reading response: %w", err)
-	}
-	var result tokenDayQueryResponse
-	err = json.Unmarshal(rawBody, &result)
+	}.json(), &result)
 	if err != nil {
 		return 0, fmt.Errorf("error unmarshaling json response: %w", err)
 	}
-
 	var total float64 = 0
 	for _, res := range result.Data.TokenDaysDatas {
 		num, err := strconv.ParseFloat(res.VolumeUSD, 64)
@@ -167,7 +149,7 @@ func (u uniswap) AssetsSwappedInBlock(id string) ([]data.Token, error) {
 
 func (u uniswap) queryTransactions(id string) (transactionQueryResponse, error) {
 	var trx transactionQueryResponse
-	res, err := u.client.Post(u.url, "application/json", m{
+	err := u.gql.Send(m{
 		"query": fmt.Sprintf(`query {
 			transactions(where: { blockNumber: "%v"}) {
 				id,
@@ -186,15 +168,7 @@ func (u uniswap) queryTransactions(id string) (transactionQueryResponse, error) 
 				}
 			  }
 		}`, id),
-	}.json())
-	if err != nil {
-		return trx, fmt.Errorf("error sending request: %w", err)
-	}
-	rawBody, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return trx, fmt.Errorf("error reading response: %w", err)
-	}
-	err = json.Unmarshal(rawBody, &trx)
+	}.json(), &trx)
 	if err != nil {
 		return trx, fmt.Errorf("error unmarshaling json response: %w", err)
 	}
