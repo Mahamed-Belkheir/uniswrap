@@ -6,18 +6,18 @@ import (
 	"github.com/mahamed-belkheir/uniswrap/data"
 )
 
-type assetPoolsHandler struct {
+type blockSwapsHandler struct {
 	uniswap data.Uniswap
 }
 
-var _ http.Handler = assetPoolsHandler{}
+var _ http.Handler = blockSwapsHandler{}
 
-func (a assetPoolsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	assetId, ok := checkQuery("id", w, r)
+func (a blockSwapsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	blockNumber, ok := checkQuery("id", w, r)
 	if !ok {
 		return
 	}
-	pools, err := a.uniswap.PoolsWithAsset(assetId)
+	swaps, err := a.uniswap.SwapsInBlock(blockNumber)
 	if err != nil {
 		m{
 			"status":  "error",
@@ -28,7 +28,7 @@ func (a assetPoolsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m{
 		"status": "success",
 		"data": m{
-			"pools": pools,
+			"swaps": swaps,
 		},
 	}.send(200, w)
 }
