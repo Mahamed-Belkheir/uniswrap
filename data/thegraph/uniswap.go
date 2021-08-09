@@ -9,7 +9,7 @@ import (
 )
 
 type uniswap struct {
-	gql GQLClient
+	gql gqlClient
 }
 
 /*NewUniswap provides a new instance of TheGraph API implementation for the uniswap data provider interface*/

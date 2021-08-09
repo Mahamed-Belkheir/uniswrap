@@ -17,7 +17,7 @@ func (q m) json() *bytes.Buffer {
 	return bytes.NewBuffer(data)
 }
 
-type GQLClient interface {
+type gqlClient interface {
 	Send(query io.Reader, v interface{}) error
 }
 
@@ -26,7 +26,7 @@ type httpPostGQL struct {
 	c   http.Client
 }
 
-var _ GQLClient = httpPostGQL{}
+var _ gqlClient = httpPostGQL{}
 
 func (h httpPostGQL) Send(query io.Reader, v interface{}) error {
 	res, err := h.c.Post(h.url, "application/json", query)

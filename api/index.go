@@ -8,6 +8,7 @@ import (
 	"github.com/mahamed-belkheir/uniswrap/data"
 )
 
+//RunWebServer boot straps the handlers and starts a http webserver
 func RunWebServer(config uniswrap.Config, uniswap data.Uniswap) {
 	router := http.ServeMux{}
 
